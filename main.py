@@ -15,6 +15,33 @@ ALLERGY_MAP = {
     16: "쇠고기", 17: "오징어", 18: "조개류(굴/전복/홍합 포함)", 19: "잣",
 }
 
+# 🌟 '맛있는 메뉴(인기 메뉴)' 키워드 목록
+POPULAR_KEYWORDS = [
+    "갈비", "불고기", "제육", "삼겹", "보쌈", "수육", "돈까스", "돈가스", "치킨", "닭강정",
+    "탕수육", "꿔바로우", "함박", "떡갈비", "너겟", "튀김", "새우튀김", "소시지", "핫도그",
+    "스파게티", "파스타", "짜장", "짬뽕", "우동", "라멘", "떡볶이", "마라탕", "마라샹궈",
+    "카레", "하이라이스", "볶음밥", "오므라이스", "피자", "버거", "샌드위치", "케이크",
+    "와플", "도넛", "마카롱", "아이스크림", "빙수", "에이드", "주스", "식혜", "푸딩", "요거트"
+]
+
+def highlight_delicious_menu(dish_name):
+    """맛있는 키워드가 포함된 경우 노란색 형광펜을 칠해줍니다."""
+    # 알레르기 태그([난류, 밀] 등)와 메뉴 이름을 분리
+    match = re.search(r"(\s*:orange\[\[.*?\]\])$", dish_name)
+    if match:
+        allergy_part = match.group(1)
+        pure_dish = dish_name[:match.start()]
+    else:
+        allergy_part = ""
+        pure_dish = dish_name
+
+    # 키워드 검사
+    for kw in POPULAR_KEYWORDS:
+        if kw in pure_dish:
+            return f":yellow-background[**{pure_dish}**]{allergy_part}"
+            
+    return dish_name
+
 def replace_allergy_codes(dish_text, convert_to_text=True):
     """메뉴명 뒤의 알레르기 번호를 감지하여 한글 식재료명으로 치환합니다."""
     if not convert_to_text or not dish_text:
@@ -147,7 +174,8 @@ try:
                                 displayed_count += 1
                                 st.markdown(":blue[**🥣 중식**]")
                                 for dish in day_meals["중식"]:
-                                    st.markdown(f"<span style='font-size:0.85rem;'>• {dish}</span>", unsafe_allow_html=True)
+                                    highlighted = highlight_delicious_menu(dish)
+                                    st.markdown(f"<span style='font-size:0.85rem;'>• {highlighted}</span>", unsafe_allow_html=True)
 
                             if meal_filter in ["전체 보기", "석식만 보기", "수요일 급식만 보기"] and "석식" in day_meals:
                                 displayed_count += 1
@@ -155,7 +183,8 @@ try:
                                     st.write("")
                                 st.markdown(":red[**🌙 석식**]")
                                 for dish in day_meals["석식"]:
-                                    st.markdown(f"<span style='font-size:0.85rem;'>• {dish}</span>", unsafe_allow_html=True)
+                                    highlighted = highlight_delicious_menu(dish)
+                                    st.markdown(f"<span style='font-size:0.85rem;'>• {highlighted}</span>", unsafe_allow_html=True)
 
                             if meal_filter in ["전체 보기", "수요일 급식만 보기"]:
                                 for m_type, dishes in day_meals.items():
@@ -163,7 +192,8 @@ try:
                                         displayed_count += 1
                                         st.markdown(f":green[**🍴 {m_type}**]")
                                         for dish in dishes:
-                                            st.markdown(f"<span style='font-size:0.85rem;'>• {dish}</span>", unsafe_allow_html=True)
+                                            highlighted = highlight_delicious_menu(dish)
+                                            st.markdown(f"<span style='font-size:0.85rem;'>• {highlighted}</span>", unsafe_allow_html=True)
 
                             if displayed_count == 0:
                                 st.caption("해당 식단 없음")

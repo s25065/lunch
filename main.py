@@ -8,7 +8,7 @@ import streamlit as st
 # 0. 기본 설정 및 상수 정의
 # ==========================================
 st.set_page_config(
-    page_title="학교 급식 달력",
+    page_title="학교 급식 달력 (수요일)",
     page_icon="🍱",
     layout="wide"
 )
@@ -20,21 +20,6 @@ ALLERGY_MAP = {
     "11": "복숭아", "12": "토마토", "13": "아황산류", "14": "호두", "15": "닭고기",
     "16": "쇠고기", "17": "오징어", "18": "조개류", "19": "잣"
 }
-
-# 디저트 및 과일 감지용 키워드 목록
-DESSERT_KEYWORDS = [
-    # 기존 디저트 / 음료 / 제과
-    "케이크", "케익", "푸딩", "주스", "쥬스", "아이스크림", "와플", "빵", "요플레",
-    "요구르트", "에이드", "타르트", "파이", "쿠키", "마카롱", "마들렌", "슈", "도넛",
-    "떡", "음료", "라떼", "스무디", "젤리", "초콜릿", "빙수", "슈크림",
-    
-    # 과일 키워드 (추가/확장)
-    "과일", "사과", "바나나", "포도", "귤", "한라봉", "천혜향", "레드향", "황금향",
-    "샤인머스캣", "샤인머스켓", "수박", "딸기", "참외", "멜론", "메론", "자두",
-    "복숭아", "망고", "파인애플", "키위", "방울토마토", "대추방울토마토", "오렌지",
-    "감귤", "단감", "홍시", "곶감", "배", "매실", "무화과", "자몽", "블루베리",
-    "체리", "석류", "체리", "리치", "람부탄", "생과일", "화채", "과일푸딩"
-]
 
 
 # ==========================================
@@ -51,16 +36,10 @@ def convert_allergy_numbers(text):
     return re.sub(r'(\.\d+)+', replace_match, text)
 
 
-def is_dessert(dish_name):
-    """메뉴 이름에 디저트 및 과일 키워드가 포함되어 있는지 확인합니다."""
-    # 알레르기 정보 등 괄호 내용을 제거한 후 키워드 검사
-    clean_name = re.sub(r'\(.*?\)', '', dish_name).strip()
-    return any(keyword in clean_name for keyword in DESSERT_KEYWORDS)
-
-
 @st.cache_data(ttl=3600)
 def fetch_meal_info(api_key, edu_code, school_code, year, month):
     """NEIS API를 호출하여 한 달치 급식 데이터를 가져옵니다."""
+    # 해당 월의 시작일과 말일 계산
     _, last_day = calendar.monthrange(year, month)
     from_ymd = f"{year}{month:02d}01"
     to_ymd = f"{year}{month:02d}{last_day:02d}"
@@ -82,9 +61,11 @@ def fetch_meal_info(api_key, edu_code, school_code, year, month):
         response.raise_for_status()
         data = response.json()
 
+        # API 응답 결과 확인
         if "mealServiceDietInfo" in data:
             return data["mealServiceDietInfo"][1]["row"], None
         elif "RESULT" in data:
+            # INFO-200: 해당 조건의 데이터가 없는 경우
             if data["RESULT"]["CODE"] == "INFO-200":
                 return [], None
             return None, f"API 오류: {data['RESULT']['MESSAGE']} ({data['RESULT']['CODE']})"
@@ -107,7 +88,7 @@ if not api_key:
     st.info("`.streamlit/secrets.toml` 파일에 `NEIS_KEY = '발급받은키'`를 입력해 주세요.")
     st.stop()
 
-# 학교 정보 입력
+# 학교 정보 입력 (기본값 설정)
 st.sidebar.subheader("🏫 학교 정보")
 edu_code = st.sidebar.text_input("시도교육청코드", value="J10", help="예: 서울 B10, 경기 J10 등")
 school_code = st.sidebar.text_input("표준학교코드", value="7530851", help="학교 고유 코드 7자리")
@@ -125,11 +106,12 @@ with st.sidebar.expander("ℹ️ 알레르기 번호 안내표"):
 # ==========================================
 # 3. 메인 화면 - 상단 컨트롤러
 # ==========================================
-st.title("🍱 월간 급식 달력")
+st.title("🍱 수요일 급식 달력")
 
+# 오늘 날짜 정보
 today = datetime.date.today()
 
-col1, col2, col3 = st.columns([1, 1, 2])
+col1, col2, col3, col4 = st.columns([1, 1, 2, 1])
 
 with col1:
     selected_year = st.selectbox("연도 선택", range(today.year - 1, today.year + 2), index=1)
@@ -143,6 +125,9 @@ with col3:
         ["전체 보기", "중식만 보기", "석식만 보기"],
         horizontal=True
     )
+
+with col4:
+    only_wednesday = st.checkbox("수요일만 보기", value=True)
 
 st.divider()
 
@@ -158,11 +143,13 @@ try:
         st.error(f"📡 API 통신 오류가 발생했습니다.\n\n{error_msg}")
         st.stop()
 
+    # 날짜별, 급식 종류별 데이터 매핑
     meals_by_date = {}
     for row in meal_data_list:
         date_str = row["MLSV_YMD"]
-        meal_type = row["MMEAL_SC_NM"]
+        meal_type = row["MMEAL_SC_NM"]  # 조식, 중식, 석식 등
         
+        # BR태그 제거 및 줄바꿈 처리
         raw_dish = row["DDISH_NM"].replace("<br/>", "\n")
         
         if convert_allergy:
@@ -182,39 +169,59 @@ except Exception as e:
 # 5. 달력 화면 렌더링
 # ==========================================
 try:
+    # 월~금(0~4) 기준 주간 달력 생성
     cal = calendar.Calendar(firstweekday=0)
     month_days = cal.monthdayscalendar(selected_year, selected_month)
 
-    # 요일 헤더 표시
+    # 요일 헤더 표시 (월~금)
     weekdays = ["월", "화", "수", "목", "금"]
     cols = st.columns(5)
     for idx, day_name in enumerate(weekdays):
-        cols[idx].markdown(f"<h4 style='text-align: center;'>{day_name}</h4>", unsafe_allow_html=True)
+        if day_name == "수":
+            cols[idx].markdown("<h4 style='text-align: center; color: #1E88E5;'>수 (선택)</h4>", unsafe_allow_html=True)
+        else:
+            style = "opacity: 0.3;" if only_wednesday else ""
+            cols[idx].markdown(f"<h4 style='text-align: center; {style}'>{day_name}</h4>", unsafe_allow_html=True)
 
     # 주별 달력 카드 생성
     for week in month_days:
         cols = st.columns(5)
         
+        # 월요일부터 금요일까지(인덱스 0~4)만 순회
         for idx in range(5):
             day = week[idx]
+            is_wednesday = (idx == 2)  # 월=0, 화=1, 수=2, 목=3, 금=4
             
             with cols[idx]:
                 if day == 0:
+                    # 빈 날짜 칸
                     st.html("<div style='border: 1px solid #ddd; border-radius: 8px; padding: 10px; min-height: 150px; background-color: #f9f9f9;'></div>")
+                    continue
+
+                # '수요일만 보기' 옵션이 켜져 있고 수요일이 아닌 경우 흐리게 처리
+                if only_wednesday and not is_wednesday:
+                    st.html(f"""
+                    <div style='border: 1px dashed #e0e0e0; border-radius: 8px; padding: 10px; min-height: 180px; background-color: #fafafa; opacity: 0.25;'>
+                        <div style='color: #aaa;'><b>{day}일</b></div>
+                    </div>
+                    """)
                     continue
 
                 date_obj = datetime.date(selected_year, selected_month, day)
                 date_key = date_obj.strftime("%Y%m%d")
                 
+                # 오늘 여부 확인
                 is_today = (date_obj == today)
                 today_badge = " <span style='background-color:#ff4b4b; color:white; padding:2px 6px; border-radius:4px; font-size:12px;'>TODAY</span>" if is_today else ""
                 
                 header_html = f"<b>{day}일</b>{today_badge}"
                 content_html = ""
                 
+                # 해당 날짜에 데이터가 있는지 확인
                 if date_key in meals_by_date:
                     day_meals = meals_by_date[date_key]
                     
+                    # 필터 적용
                     filtered_types = []
                     if meal_filter == "중식만 보기":
                         filtered_types = ["중식"]
@@ -227,41 +234,32 @@ try:
                     for m_type in filtered_types:
                         if m_type in day_meals:
                             has_meal = True
-                            
+                            # 급식 유형별 색상 배정
                             if m_type == "중식":
                                 badge_color = "#1E88E5" # 파란색
                             elif m_type == "석식":
                                 badge_color = "#E53935" # 빨간색
                             else:
-                                badge_color = "#43A047" # 초록색
+                                badge_color = "#43A047" # 초록색 (조식 등)
                                 
                             content_html += f"<div style='margin-top:6px;'><span style='color:{badge_color}; font-weight:bold;'>[{m_type}]</span></div>"
                             
-                            # 메뉴 출력 및 디저트/과일 색상 강조
+                            # 메뉴 목록을 줄 단위로 나열
                             for dish in day_meals[m_type]:
-                                dish_text = dish.strip()
-                                if dish_text:
-                                    # 디저트 및 과일 여부 판단
-                                    if is_dessert(dish_text):
-                                        # 오렌지/핑크 배지 스타일 강조 (아이콘 🍎/🧁)
-                                        content_html += f"""
-                                        <div style='font-size:13px; line-height:1.4; margin: 2px 0;'>
-                                            • <span style='background-color: #ffe0b2; color: #e65100; font-weight: bold; padding: 1px 5px; border-radius: 4px; border: 1px solid #ffcc80;'>
-                                                🧁 {dish_text}
-                                            </span>
-                                        </div>
-                                        """
-                                    else:
-                                        # 일반 메뉴
-                                        content_html += f"<div style='font-size:13px; line-height:1.4;'>• {dish_text}</div>"
+                                if dish.strip():
+                                    content_html += f"<div style='font-size:13px; line-height:1.4;'>• {dish.strip()}</div>"
                     
                     if not has_meal:
                         content_html += "<div style='color: #888; font-size:12px; margin-top:10px;'>해당 식단 없음</div>"
                 else:
                     content_html += "<div style='color: #aaa; font-size:12px; margin-top:10px;'>급식 없음</div>"
 
-                card_style = "border: 2px solid #ff4b4b; background-color: #fff0f0;" if is_today else "border: 1px solid #e0e0e0; background-color: #ffffff;"
-                
+                # 테두리 및 카드 스타일 (오늘 날짜 및 수요일 스타일 적용)
+                border_style = "2px solid #1E88E5" if is_wednesday else "1px solid #e0e0e0"
+                card_style = f"border: {border_style}; background-color: #ffffff;"
+                if is_today:
+                    card_style = "border: 2px solid #ff4b4b; background-color: #fff0f0;"
+
                 st.html(f"""
                 <div style='{card_style} border-radius: 8px; padding: 10px; min-height: 180px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>
                     <div>{header_html}</div>

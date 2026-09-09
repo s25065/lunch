@@ -122,7 +122,7 @@ try:
             ymd = row.get("MLSV_YMD")
             meal_type = row.get("MMEAL_SC_NM", "급식")
             dish = row.get("DDISH_NM", "")
-            cal_info = row.get("CAL_INFO", "").strip()  # 💡 칼로리 정보 가져오기 (예: "650.4 Kcal")
+            cal_info = row.get("CAL_INFO", "").strip()
 
             formatted_dish = replace_allergy_codes(dish, convert_to_text=show_allergen_names)
             dish_lines = [d.strip() for d in formatted_dish.replace("<br/>", "\n").split("\n") if d.strip()]
@@ -144,6 +144,10 @@ try:
         for i in range(5):
             day = week[i]
             is_wednesday = (i == 2)  # 월:0, 화:1, 수:2, 목:3, 금:4
+
+            # 💡 '수요일 급식만 보기' 모드일 때는 수요일이 아닌 요일 칼럼을 아예 렌더링하지 않음
+            if meal_filter == "수요일 급식만 보기" and not is_wednesday:
+                continue
 
             with cols[i]:
                 if day == 0:
@@ -170,9 +174,7 @@ try:
                         st.divider()
 
                         # --- 식단 표시 조건 ---
-                        if meal_filter == "수요일 급식만 보기" and not is_wednesday:
-                            st.caption("필터 제외 (수요일 아님)")
-                        elif not day_meals:
+                        if not day_meals:
                             st.caption("급식 없음 (휴업/방학)")
                         else:
                             displayed_count = 0

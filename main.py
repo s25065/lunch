@@ -36,7 +36,6 @@ def highlight_delicious_menu(dish_name):
 
     for kw in POPULAR_KEYWORDS:
         if kw in pure_dish:
-            # 은은한 파스텔 반투명 노랑 배경 + 자연스러운 Bold
             highlighted_text = (
                 f"<mark style='background-color: rgba(255, 235, 59, 0.45); "
                 f"font-weight: 600; padding: 1px 4px; border-radius: 3px;'>"
@@ -123,11 +122,15 @@ try:
             ymd = row.get("MLSV_YMD")
             meal_type = row.get("MMEAL_SC_NM", "급식")
             dish = row.get("DDISH_NM", "")
+            cal_info = row.get("CAL_INFO", "").strip()  # 💡 칼로리 정보 가져오기 (예: "650.4 Kcal")
 
             formatted_dish = replace_allergy_codes(dish, convert_to_text=show_allergen_names)
             dish_lines = [d.strip() for d in formatted_dish.replace("<br/>", "\n").split("\n") if d.strip()]
 
-            meal_dict.setdefault(ymd, {})[meal_type] = dish_lines
+            meal_dict.setdefault(ymd, {})[meal_type] = {
+                "dishes": dish_lines,
+                "calorie": cal_info
+            }
 
     month_cal = calendar.monthcalendar(year, month)
     weekdays_kr = ["월", "화", "수", "목", "금"]
@@ -176,8 +179,9 @@ try:
 
                             if meal_filter in ["전체 보기", "중식만 보기", "수요일 급식만 보기"] and "중식" in day_meals:
                                 displayed_count += 1
-                                st.markdown(":blue[**🥣 중식**]")
-                                for dish in day_meals["중식"]:
+                                cal_str = f" <span style='font-size:0.75rem; color:#888888;'>({day_meals['중식']['calorie']})</span>" if day_meals['중식']['calorie'] else ""
+                                st.markdown(f":blue[**🥣 중식**]{cal_str}", unsafe_allow_html=True)
+                                for dish in day_meals["중식"]["dishes"]:
                                     highlighted = highlight_delicious_menu(dish)
                                     st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
 
@@ -185,17 +189,19 @@ try:
                                 displayed_count += 1
                                 if (meal_filter in ["전체 보기", "수요일 급식만 보기"]) and "중식" in day_meals:
                                     st.write("")
-                                st.markdown(":red[**🌙 석식**]")
-                                for dish in day_meals["석식"]:
+                                cal_str = f" <span style='font-size:0.75rem; color:#888888;'>({day_meals['석식']['calorie']})</span>" if day_meals['석식']['calorie'] else ""
+                                st.markdown(f":red[**🌙 석식**]{cal_str}", unsafe_allow_html=True)
+                                for dish in day_meals["석식"]["dishes"]:
                                     highlighted = highlight_delicious_menu(dish)
                                     st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
 
                             if meal_filter in ["전체 보기", "수요일 급식만 보기"]:
-                                for m_type, dishes in day_meals.items():
+                                for m_type, meal_info in day_meals.items():
                                     if m_type not in ["중식", "석식"]:
                                         displayed_count += 1
-                                        st.markdown(f":green[**🍴 {m_type}**]")
-                                        for dish in dishes:
+                                        cal_str = f" <span style='font-size:0.75rem; color:#888888;'>({meal_info['calorie']})</span>" if meal_info['calorie'] else ""
+                                        st.markdown(f":green[**🍴 {m_type}**]{cal_str}", unsafe_allow_html=True)
+                                        for dish in meal_info["dishes"]:
                                             highlighted = highlight_delicious_menu(dish)
                                             st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
 

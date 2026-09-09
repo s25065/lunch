@@ -25,8 +25,8 @@ POPULAR_KEYWORDS = [
 ]
 
 def highlight_delicious_menu(dish_name):
-    """맛있는 키워드가 포함된 경우 노란색 형광펜을 칠해줍니다."""
-    # 알레르기 태그([난류, 밀] 등)와 메뉴 이름을 분리
+    """HTML/CSS를 활용해 쨍하고 진한 형광펜 효과를 입힙니다."""
+    # 알레르기 태그 분리
     match = re.search(r"(\s*:orange\[\[.*?\]\])$", dish_name)
     if match:
         allergy_part = match.group(1)
@@ -35,10 +35,15 @@ def highlight_delicious_menu(dish_name):
         allergy_part = ""
         pure_dish = dish_name
 
-    # 키워드 검사
+    # 키워드 검사 후 진한 형광펜(선명한 노랑 배경 + 진한 검은 글씨) 적용
     for kw in POPULAR_KEYWORDS:
         if kw in pure_dish:
-            return f":yellow-background[**{pure_dish}**]{allergy_part}"
+            highlighted_text = (
+                f"<mark style='background-color: #FFEB3B; color: #000000; "
+                f"font-weight: 800; padding: 2px 5px; border-radius: 4px;'>"
+                f"{pure_dish}</mark>"
+            )
+            return f"{highlighted_text}{allergy_part}"
             
     return dish_name
 
@@ -175,7 +180,7 @@ try:
                                 st.markdown(":blue[**🥣 중식**]")
                                 for dish in day_meals["중식"]:
                                     highlighted = highlight_delicious_menu(dish)
-                                    st.markdown(f"<span style='font-size:0.85rem;'>• {highlighted}</span>", unsafe_allow_html=True)
+                                    st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
 
                             if meal_filter in ["전체 보기", "석식만 보기", "수요일 급식만 보기"] and "석식" in day_meals:
                                 displayed_count += 1
@@ -184,7 +189,7 @@ try:
                                 st.markdown(":red[**🌙 석식**]")
                                 for dish in day_meals["석식"]:
                                     highlighted = highlight_delicious_menu(dish)
-                                    st.markdown(f"<span style='font-size:0.85rem;'>• {highlighted}</span>", unsafe_allow_html=True)
+                                    st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
 
                             if meal_filter in ["전체 보기", "수요일 급식만 보기"]:
                                 for m_type, dishes in day_meals.items():
@@ -193,7 +198,7 @@ try:
                                         st.markdown(f":green[**🍴 {m_type}**]")
                                         for dish in dishes:
                                             highlighted = highlight_delicious_menu(dish)
-                                            st.markdown(f"<span style='font-size:0.85rem;'>• {highlighted}</span>", unsafe_allow_html=True)
+                                            st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
 
                             if displayed_count == 0:
                                 st.caption("해당 식단 없음")

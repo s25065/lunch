@@ -15,7 +15,6 @@ ALLERGY_MAP = {
     16: "쇠고기", 17: "오징어", 18: "조개류(굴/전복/홍합 포함)", 19: "잣",
 }
 
-# 🌟 '맛있는 메뉴(인기 메뉴)' 키워드 목록
 POPULAR_KEYWORDS = [
     "갈비", "불고기", "제육", "삼겹", "보쌈", "수육", "돈까스", "돈가스", "치킨", "닭강정",
     "탕수육", "꿔바로우", "함박", "떡갈비", "너겟", "튀김", "새우튀김", "소시지", "핫도그",
@@ -61,6 +60,58 @@ def replace_allergy_codes(dish_text, convert_to_text=True):
     pattern = r"\(?(\d+\.)+\)?"
     return re.sub(pattern, convert_match, dish_text)
 
+def render_meal_card(day, day_meals, is_today, is_wednesday):
+    """단일 날짜의 급식 카드를 출력하는 공통 함수"""
+    with st.container(border=True):
+        title_str = f"**{month}월 {day}일 ({'수' if is_wednesday else '요일'})**"
+        
+        if is_today and is_wednesday:
+            st.markdown(f"{title_str} :orange-background[**TODAY**] :green-background[**수요일**]")
+        elif is_today:
+            st.markdown(f"{title_str} :orange-background[**TODAY**]")
+        elif is_wednesday:
+            st.markdown(f"{title_str} :green-background[**수요일 🎯**]")
+        else:
+            st.markdown(title_str)
+
+        st.divider()
+
+        if not day_meals:
+            st.caption("급식 없음 (휴업/방학)")
+        else:
+            displayed_count = 0
+
+            if meal_filter in ["전체 보기", "중식만 보기", "수요일 급식만 보기"] and "중식" in day_meals:
+                displayed_count += 1
+                cal_str = f" <span style='font-size:0.75rem; color:#888888;'>({day_meals['중식']['calorie']})</span>" if day_meals['중식']['calorie'] else ""
+                st.markdown(f":blue[**🥣 중식**]{cal_str}", unsafe_allow_html=True)
+                for dish in day_meals["중식"]["dishes"]:
+                    highlighted = highlight_delicious_menu(dish)
+                    st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
+
+            if meal_filter in ["전체 보기", "석식만 보기", "수요일 급식만 보기"] and "석식" in day_meals:
+                displayed_count += 1
+                if (meal_filter in ["전체 보기", "수요일 급식만 보기"]) and "중식" in day_meals:
+                    st.write("")
+                cal_str = f" <span style='font-size:0.75rem; color:#888888;'>({day_meals['석식']['calorie']})</span>" if day_meals['석식']['calorie'] else ""
+                st.markdown(f":red[**🌙 석식**]{cal_str}", unsafe_allow_html=True)
+                for dish in day_meals["석식"]["dishes"]:
+                    highlighted = highlight_delicious_menu(dish)
+                    st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
+
+            if meal_filter in ["전체 보기", "수요일 급식만 보기"]:
+                for m_type, meal_info in day_meals.items():
+                    if m_type not in ["중식", "석식"]:
+                        displayed_count += 1
+                        cal_str = f" <span style='font-size:0.75rem; color:#888888;'>({meal_info['calorie']})</span>" if meal_info['calorie'] else ""
+                        st.markdown(f":green[**🍴 {m_type}**]{cal_str}", unsafe_allow_html=True)
+                        for dish in meal_info["dishes"]:
+                            highlighted = highlight_delicious_menu(dish)
+                            st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
+
+            if displayed_count == 0:
+                st.caption("해당 식단 없음")
+
 st.sidebar.header("⚙️ 학교 정보 설정")
 office_code = st.sidebar.text_input("시도교육청코드", value="T10", help="기본값: 제주특별자치도교육청(T10)")
 school_code = st.sidebar.text_input("표준학교코드", value="9290088", help="기본값: 제주중앙고등학교(9290088)")
@@ -91,7 +142,6 @@ with col_filter:
     )
 
 def fetch_monthly_meals(key, ofcdc_code, schul_code, yr, mo):
-    """선택한 월의 1일부터 말일까지의 급식을 조회합니다."""
     _, last_day = calendar.monthrange(yr, mo)
     from_ymd = f"{yr}{mo:02d}01"
     to_ymd = f"{yr}{mo:02d}{last_day:02d}"
@@ -137,81 +187,50 @@ try:
 
     st.markdown("---")
 
-    for week in month_cal:
-        cols = st.columns(5)
-        has_school_day = False
+    # 🌟 1) '수요일 급식만 보기' 모드일 때는 이번 달 수요일만 가로 나열
+    if meal_filter == "수요일 급식만 보기":
+        wednesdays = []
+        for week in month_cal:
+            wed_day = week[2]  # 수요일 날짜
+            if wed_day != 0:
+                wednesdays.append(wed_day)
 
-        for i in range(5):
-            day = week[i]
-            is_wednesday = (i == 2)  # 월:0, 화:1, 수:2, 목:3, 금:4
+        if wednesdays:
+            # 4개 단위로 컬럼 나열
+            cols = st.columns(min(len(wednesdays), 4))
+            for idx, day in enumerate(wednesdays):
+                col_idx = idx % 4
+                if idx > 0 and col_idx == 0:
+                    cols = st.columns(min(len(wednesdays) - idx, 4))
 
-            # 💡 '수요일 급식만 보기' 모드일 때는 수요일이 아닌 요일 칼럼을 아예 렌더링하지 않음
-            if meal_filter == "수요일 급식만 보기" and not is_wednesday:
-                continue
-
-            with cols[i]:
-                if day == 0:
-                    st.empty()
-                else:
-                    has_school_day = True
+                with cols[col_idx]:
                     ymd_str = f"{year}{month:02d}{day:02d}"
                     day_meals = meal_dict.get(ymd_str, {})
                     is_today = (year == today.year and month == today.month and day == today.day)
+                    render_meal_card(day, day_meals, is_today, is_wednesday=True)
 
-                    with st.container(border=True):
-                        # --- 날짜 및 요일 헤더 (수요일 강조) ---
-                        title_str = f"**{month}월 {day}일 ({weekdays_kr[i]})**"
-                        
-                        if is_today and is_wednesday:
-                            st.markdown(f"{title_str} :orange-background[**TODAY**] :green-background[**수요일**]")
-                        elif is_today:
-                            st.markdown(f"{title_str} :orange-background[**TODAY**]")
-                        elif is_wednesday:
-                            st.markdown(f"{title_str} :green-background[**수요일 🎯**]")
-                        else:
-                            st.markdown(title_str)
+    # 🌟 2) 일반 달력 모드 (전체 보기, 중식만 보기, 석식만 보기)
+    else:
+        for week in month_cal:
+            cols = st.columns(5)
+            has_school_day = False
 
-                        st.divider()
+            for i in range(5):
+                day = week[i]
+                is_wednesday = (i == 2)
 
-                        # --- 식단 표시 조건 ---
-                        if not day_meals:
-                            st.caption("급식 없음 (휴업/방학)")
-                        else:
-                            displayed_count = 0
+                with cols[i]:
+                    if day == 0:
+                        st.empty()
+                    else:
+                        has_school_day = True
+                        ymd_str = f"{year}{month:02d}{day:02d}"
+                        day_meals = meal_dict.get(ymd_str, {})
+                        is_today = (year == today.year and month == today.month and day == today.day)
+                        render_meal_card(day, day_meals, is_today, is_wednesday)
 
-                            if meal_filter in ["전체 보기", "중식만 보기", "수요일 급식만 보기"] and "중식" in day_meals:
-                                displayed_count += 1
-                                cal_str = f" <span style='font-size:0.75rem; color:#888888;'>({day_meals['중식']['calorie']})</span>" if day_meals['중식']['calorie'] else ""
-                                st.markdown(f":blue[**🥣 중식**]{cal_str}", unsafe_allow_html=True)
-                                for dish in day_meals["중식"]["dishes"]:
-                                    highlighted = highlight_delicious_menu(dish)
-                                    st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
-
-                            if meal_filter in ["전체 보기", "석식만 보기", "수요일 급식만 보기"] and "석식" in day_meals:
-                                displayed_count += 1
-                                if (meal_filter in ["전체 보기", "수요일 급식만 보기"]) and "중식" in day_meals:
-                                    st.write("")
-                                cal_str = f" <span style='font-size:0.75rem; color:#888888;'>({day_meals['석식']['calorie']})</span>" if day_meals['석식']['calorie'] else ""
-                                st.markdown(f":red[**🌙 석식**]{cal_str}", unsafe_allow_html=True)
-                                for dish in day_meals["석식"]["dishes"]:
-                                    highlighted = highlight_delicious_menu(dish)
-                                    st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
-
-                            if meal_filter in ["전체 보기", "수요일 급식만 보기"]:
-                                for m_type, meal_info in day_meals.items():
-                                    if m_type not in ["중식", "석식"]:
-                                        displayed_count += 1
-                                        cal_str = f" <span style='font-size:0.75rem; color:#888888;'>({meal_info['calorie']})</span>" if meal_info['calorie'] else ""
-                                        st.markdown(f":green[**🍴 {m_type}**]{cal_str}", unsafe_allow_html=True)
-                                        for dish in meal_info["dishes"]:
-                                            highlighted = highlight_delicious_menu(dish)
-                                            st.markdown(f"<span style='font-size:0.88rem;'>• {highlighted}</span>", unsafe_allow_html=True)
-
-                            if displayed_count == 0:
-                                st.caption("해당 식단 없음")
-
-        if has_school_day:
-            st.write("")
+            if has_school_day:
+                st.write("")
 
 except requests.exceptions.RequestException as e:
     st.error(f"⚠️ 나이스 API 통신 오류: 네트워크 상태를 확인해 주세요. ({e})")

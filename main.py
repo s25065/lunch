@@ -25,8 +25,7 @@ POPULAR_KEYWORDS = [
 ]
 
 def highlight_delicious_menu(dish_name):
-    """HTML/CSS를 활용해 쨍하고 진한 형광펜 효과를 입힙니다."""
-    # 알레르기 태그 분리
+    """은은하고 부드러운 파스텔 형광펜 효과를 입힙니다."""
     match = re.search(r"(\s*:orange\[\[.*?\]\])$", dish_name)
     if match:
         allergy_part = match.group(1)
@@ -35,12 +34,12 @@ def highlight_delicious_menu(dish_name):
         allergy_part = ""
         pure_dish = dish_name
 
-    # 키워드 검사 후 진한 형광펜(선명한 노랑 배경 + 진한 검은 글씨) 적용
     for kw in POPULAR_KEYWORDS:
         if kw in pure_dish:
+            # 은은한 파스텔 반투명 노랑 배경 + 자연스러운 Bold
             highlighted_text = (
-                f"<mark style='background-color: #FFEB3B; color: #000000; "
-                f"font-weight: 800; padding: 2px 5px; border-radius: 4px;'>"
+                f"<mark style='background-color: rgba(255, 235, 59, 0.45); "
+                f"font-weight: 600; padding: 1px 4px; border-radius: 3px;'>"
                 f"{pure_dish}</mark>"
             )
             return f"{highlighted_text}{allergy_part}"

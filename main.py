@@ -53,7 +53,6 @@ with col_y:
 with col_m:
     month = st.selectbox("월 선택", options=list(range(1, 13)), index=today.month - 1)
 with col_filter:
-    # '수요일 급식만 보기' 옵션 추가
     meal_filter = st.radio(
         "급식 종류 선택", 
         options=["전체 보기", "중식만 보기", "석식만 보기", "수요일 급식만 보기"], 
@@ -122,14 +121,21 @@ try:
                     is_today = (year == today.year and month == today.month and day == today.day)
 
                     with st.container(border=True):
-                        if is_today:
-                            st.markdown(f"**{month}월 {day}일 ({weekdays_kr[i]})** :orange-background[**TODAY**]")
+                        # --- 날짜 및 요일 헤더 (수요일 강조) ---
+                        title_str = f"**{month}월 {day}일 ({weekdays_kr[i]})**"
+                        
+                        if is_today and is_wednesday:
+                            st.markdown(f"{title_str} :orange-background[**TODAY**] :green-background[**수요일**]")
+                        elif is_today:
+                            st.markdown(f"{title_str} :orange-background[**TODAY**]")
+                        elif is_wednesday:
+                            st.markdown(f"{title_str} :green-background[**수요일 🎯**]")
                         else:
-                            st.markdown(f"**{month}월 {day}일 ({weekdays_kr[i]})**")
+                            st.markdown(title_str)
 
                         st.divider()
 
-                        # '수요일 급식만 보기' 선택 시 수요일이 아닌 날은 비활성화 표시
+                        # --- 식단 표시 조건 ---
                         if meal_filter == "수요일 급식만 보기" and not is_wednesday:
                             st.caption("필터 제외 (수요일 아님)")
                         elif not day_meals:
